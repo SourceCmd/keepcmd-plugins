@@ -109,14 +109,28 @@ x-ajax-headers: &ajax_headers
 verbs:
   - name: list_options
     description: |
-      The sports, locations and courts the portal offers, as value/label
-      pairs. Pass sport (and location) to see that sport's locations and
-      courts. Values are what the other verbs take as sport, location and
-      court. The list also holds the form's time-of-day choices; ignore
-      those.
+      The sports the portal books, with the club and location choices, as
+      value/label pairs from the booking page. Values are what the other
+      verbs take as sport and location. For a sport's courts, use
+      list_courts.
+    grant_categories: [read]
+    output: json
+    http:
+      method: GET
+      url: "https://{{config.portal_host}}/event/reserve-court-new"
+      response:
+        extract:
+          regex: '<option value="(?P<value>-?\d+)"[^>]*>(?P<label>[^<]+)</option>'
+
+  - name: list_courts
+    description: |
+      The locations and courts for one sport on one date, as value/label
+      pairs (the form's time-of-day choices are in the list too; ignore
+      them).
     grant_categories: [read]
     args:
-      sport: { type: string, required: false }
+      sport: { type: string, required: true }
+      date: { type: string, required: true }      # MM/DD/YYYY
       location: { type: string, required: false }
     output: json
     http:
@@ -124,16 +138,7 @@ verbs:
       url: "https://{{config.portal_host}}/event/reserve-court-new?ajax=true"
       headers: *ajax_headers
       form:
-        reservation-list-page: "1"
-        user_id: "{{session.member_id}}"
-        host: "{{session.member_id}}"
-        event_member_token_reserve_court: "{{session.form_token}}"
-        current_guest_count: "0"
-        component: "{{args.sport || \"\"}}"
-        club: "{{config.club || \"1\"}}"
-        location: "{{args.location || \"-1\"}}"
-        court: "-1"
-        date: ""
+        <<: *booking_form
         interval: "60"
         time-reserve: ""
         location-reserve: ""
@@ -290,6 +295,8 @@ verbs:
 # cancel have no rule, so your keep asks you every time, showing the summary.
 default_rules:
   - action: external_resource.verge_labs/club_automation.list_options
+    decision: allow
+  - action: external_resource.verge_labs/club_automation.list_courts
     decision: allow
   - action: external_resource.verge_labs/club_automation.list_slots
     decision: allow

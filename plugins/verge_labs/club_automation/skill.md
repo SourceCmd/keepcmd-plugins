@@ -23,7 +23,8 @@ the chat asked. Your keep asks your owner before every `reserve` and
 
 | Verb | Does | Asks the owner |
 |---|---|---|
-| `list_options` | sports, locations, courts (value + label) | no |
+| `list_options` | sports and locations (value + label) | no |
+| `list_courts` | a sport's courts on a date (value + label) | no |
 | `list_slots` | open start times for a sport, date and length | no |
 | `my_reservations` | upcoming bookings, with ids | no |
 | `reserve_preview` | what a booking would be, and who's invoiced | no |
@@ -35,8 +36,8 @@ the chat asked. Your keep asks your owner before every `reserve` and
 
 1. **Find the sport's value** (once; remember it for the conversation):
    `list_options` → find the label (`Squash`, `Tennis`) and its value.
-   To pick a court, call `list_options` again with `sport` (and `location`)
-   and read the court labels (`Court 3`).
+   To pick a court, call `list_courts` with `sport` and `date` and read the
+   court labels (`Court 3`).
 2. **List open times:** `list_slots` with `sport`, `date` as `MM/DD/YYYY`,
    `minutes` (60 or 90, whatever the person asked; ask if they didn't),
    and `court` if they named one.
