@@ -36,7 +36,7 @@ the chat asked. Your keep asks your owner before every `reserve` and
 1. **Find the sport's value** (once; remember it for the conversation):
    `list_options` → find the label (`Squash`, `Tennis`) and its value.
    To pick a court, call `list_options` again with `sport` (and `location`)
-   and read the court labels (`Court 9`).
+   and read the court labels (`Court 3`).
 2. **List open times:** `list_slots` with `sport`, `date` as `MM/DD/YYYY`,
    `minutes` (60 or 90, whatever the person asked; ask if they didn't),
    and `court` if they named one.
@@ -53,7 +53,7 @@ the chat asked. Your keep asks your owner before every `reserve` and
    `location`, `surface`. Read the day, time, place and invoice it shows.
 5. **Book:** `reserve` with the same arguments plus `summary`: the day, time
    and court in words, as the preview showed them, and any charge, e.g.
-   `"Fri Oct 31, 7:00–8:00 PM, South End Court 9, no invoice"`. The summary
+   `"Fri Oct 31, 7:00–8:00 PM, Center Court 3, no invoice"`. The summary
    is what your owner reads when asked; it must match the slot.
 6. **Confirm:** the answer says "Reservation Completed" when it worked.
    Reply in the chat with the day, time and court.
