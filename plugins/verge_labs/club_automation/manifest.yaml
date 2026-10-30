@@ -1,0 +1,301 @@
+plugin_slug: verge_labs/club_automation
+namespace: verge_labs
+author: Verge Labs
+display_name: Club Automation courts
+description: |
+  Find and book courts (tennis, squash, pickleball, padel, racquetball) at a
+  club whose member portal runs on Club Automation. Signs in as you with your
+  portal email and password; the keep holds the session, and your agent never
+  sees either. Configure with your club's portal address.
+version: 0.1.0
+# Session sign-in (D-415) needs manifest_schema 3; older keeps refuse it.
+manifest_schema: 3
+auth_scheme: none
+
+config_schema:
+  type: object
+  required: [portal_host]
+  properties:
+    portal_host:
+      type: string
+      description: |
+        Your club's member portal, without https://. Example:
+        myclub.clubautomation.com
+    club:
+      type: string
+      description: |
+        The club id the portal books at. Most clubs have one: leave it at 1.
+      default: "1"
+
+credentials:
+  - name: email
+    description: The email you sign in to your club's member portal with.
+    secret: false
+  - name: password
+    description: Your member portal password.
+    secret: true
+    wizard_guide: |
+      The password you use to sign in to your club's member portal. It is
+      sealed on your keep, and your agents never see it.
+
+session:
+  hosts: ["{{config.portal_host}}"]
+  sign_in:
+    # The home page sets the first cookie and carries a one-time login token.
+    - name: login_page
+      method: GET
+      url: "https://{{config.portal_host}}/"
+      capture:
+        login_token: { from: body, regex: 'name="login_token" value="([^"]+)"' }
+    - name: login
+      method: POST
+      url: "https://{{config.portal_host}}/login/login"
+      headers:
+        X-Requested-With: XMLHttpRequest
+        Origin: "https://{{config.portal_host}}"
+        Referer: "https://{{config.portal_host}}/"
+      form:
+        email: "{{credentials.email}}"
+        password: "{{credentials.password}}"
+        login_token: "{{session.login_token}}"
+      success:
+        status: [200]
+        body_regex: '"isLoggedIn":\s*true'
+    # Every booking call carries the member's id and a form token from the
+    # booking page.
+    - name: booking_page
+      method: GET
+      url: "https://{{config.portal_host}}/event/reserve-court-new"
+      capture:
+        member_id: { from: body, regex: 'name="user_id" value="(\d+)"' }
+        form_token: { from: body, regex: 'name="event_member_token_reserve_court" value="([^"]+)"' }
+  sign_out:
+    method: GET
+    url: "https://{{config.portal_host}}/user/logout"
+  # TO CONFIRM against the live portal: how a lapsed session answers an ajax
+  # call. A signed-out portal shows its sign-in form.
+  expired_when:
+    status: [401, 403]
+    location_regex: '/login'
+    body_regex: 'id="caSignInLoginForm"'
+  idle_minutes: 20
+
+# The booking form's fields, shared by every verb that posts it. The portal
+# expects the whole form each time.
+x-booking-form: &booking_form
+  reservation-list-page: "1"
+  user_id: "{{session.member_id}}"
+  host: "{{session.member_id}}"
+  event_member_token_reserve_court: "{{session.form_token}}"
+  current_guest_count: "0"
+  add-new-child-to-guest_1: ""
+  add-new-child-to-guest_2: ""
+  add-new-child-to-guest_3: ""
+  component: "{{args.sport}}"
+  club: "{{config.club || \"1\"}}"
+  location: "{{args.location || \"-1\"}}"
+  court: "{{args.court || \"-1\"}}"
+  date: "{{args.date}}"
+  interval: "{{args.minutes}}"
+  timeFrom: "0"
+  timeTo: "0"
+  courtsnotavailable: ""
+
+x-ajax-headers: &ajax_headers
+  X-Requested-With: XMLHttpRequest
+  Origin: "https://{{config.portal_host}}"
+  Referer: "https://{{config.portal_host}}/event/reserve-court-new"
+
+verbs:
+  - name: list_options
+    description: |
+      The sports, locations and courts the portal offers, as value/label
+      pairs. Pass sport (and location) to see that sport's locations and
+      courts. Values are what the other verbs take as sport, location and
+      court. The list also holds the form's time-of-day choices; ignore
+      those.
+    grant_categories: [read]
+    args:
+      sport: { type: string, required: false }
+      location: { type: string, required: false }
+    output: json
+    http:
+      method: POST
+      url: "https://{{config.portal_host}}/event/reserve-court-new?ajax=true"
+      headers: *ajax_headers
+      form:
+        reservation-list-page: "1"
+        user_id: "{{session.member_id}}"
+        host: "{{session.member_id}}"
+        event_member_token_reserve_court: "{{session.form_token}}"
+        current_guest_count: "0"
+        component: "{{args.sport || \"\"}}"
+        club: "{{config.club || \"1\"}}"
+        location: "{{args.location || \"-1\"}}"
+        court: "-1"
+        date: ""
+        interval: "60"
+        time-reserve: ""
+        location-reserve: ""
+        surface-reserve: ""
+        join-waitlist-case: "0"
+        skipTimesSearch: "1"
+      response:
+        extract:
+          regex: '<option value="(?P<value>-?\d+)"[^>]*>(?P<label>[^<]+)</option>'
+
+  - name: list_slots
+    description: |
+      Open start times for one sport on one date, for a booking of the given
+      length. Each slot has start (pass it to reserve as is), location,
+      surface and the time as the portal shows it. An empty list means
+      nothing is open.
+    grant_categories: [read]
+    args:
+      sport: { type: string, required: true }
+      date: { type: string, required: true }      # MM/DD/YYYY
+      minutes: { type: int, required: true }      # 60 or 90, as the club allows
+      location: { type: string, required: false }
+      court: { type: string, required: false }
+    output: json
+    http:
+      method: POST
+      url: "https://{{config.portal_host}}/event/reserve-court-new?ajax=true"
+      headers: *ajax_headers
+      form:
+        <<: *booking_form
+        time-reserve: ""
+        location-reserve: ""
+        surface-reserve: ""
+        join-waitlist-case: "0"
+      response:
+        extract:
+          regex: '<a href="javascript:void\(0\);" t="(?P<start>\d+)" l="(?P<location>-?\d+)" s="(?P<surface>-?\d+)">\s*(?P<time>[^<]+?)\s*</a>'
+          fields: { start: number }
+
+  - name: my_reservations
+    description: |
+      Your upcoming reservations: date, time, activity (with the court) and
+      the id that cancel takes.
+    grant_categories: [read]
+    output: json
+    http:
+      method: GET
+      url: "https://{{config.portal_host}}/event/reserve-court-new"
+      response:
+        extract:
+          regex: '(?s)<tr[^>]*>\s*<td>\s*<b>\s*(?P<date>[^<]+?)\s*</b>\s*</td>\s*<td>\s*(?P<time>[^<]+?)\s*</td>\s*<td>\s*(?P<host>[^<]*?)\s*</td>\s*<td>\s*(?P<activity>[^<]+?)\s*</td>.*?cid="(?P<id>\d+)"'
+
+  - name: reserve_preview
+    description: |
+      What a booking would be, without making it: day and time, location,
+      and who would be invoiced. Run it before reserve, and put what it says
+      in your request to book.
+    grant_categories: [read]
+    args:
+      sport: { type: string, required: true }
+      date: { type: string, required: true }
+      minutes: { type: int, required: true }
+      start: { type: int, required: true }
+      location: { type: string, required: true }
+      surface: { type: string, required: true }
+      court: { type: string, required: false }
+    output: text
+    http:
+      method: POST
+      url: "https://{{config.portal_host}}/event/reserve-court-new-do?ajax=true"
+      headers: *ajax_headers
+      form:
+        <<: *booking_form
+        time-reserve: "{{args.start}}"
+        location-reserve: "{{args.location}}"
+        surface-reserve: "{{args.surface}}"
+        join-waitlist-case: "1"
+      response:
+        output: text
+        success:
+          body_regex: 'Day/Time'
+
+  - name: reserve
+    description: |
+      Book the slot. Takes the same arguments as reserve_preview, plus
+      summary: the day, time and court in words, exactly as the preview
+      showed them (it is what your owner sees when asked).
+    grant_categories: [write]
+    args:
+      summary: { type: string, required: true }
+      sport: { type: string, required: true }
+      date: { type: string, required: true }
+      minutes: { type: int, required: true }
+      start: { type: int, required: true }
+      location: { type: string, required: true }
+      surface: { type: string, required: true }
+      court: { type: string, required: false }
+    output: text
+    http:
+      method: POST
+      url: "https://{{config.portal_host}}/event/reserve-court-new-do?ajax=true"
+      headers: *ajax_headers
+      form:
+        <<: *booking_form
+        time-reserve: "{{args.start}}"
+        location-reserve: "{{args.location}}"
+        surface-reserve: "{{args.surface}}"
+        join-waitlist-case: "1"
+        is_confirmed: "1"
+      response:
+        output: text
+        success:
+          body_regex: 'Reservation Completed'
+
+  - name: cancel_check
+    description: |
+      What cancelling a reservation would mean, without cancelling: the
+      portal's warning, such as a late-cancellation charge. Run it before
+      cancel, and put what it says in your request to cancel.
+    grant_categories: [read]
+    args:
+      id: { type: string, required: true }
+    output: text
+    http:
+      method: POST
+      url: "https://{{config.portal_host}}/event/cancel-court-time?ajax=true"
+      headers: *ajax_headers
+      form:
+        id: "{{args.id}}"
+      response:
+        output: text
+
+  - name: cancel
+    description: |
+      Cancel a reservation by its id (from my_reservations). Takes summary:
+      the day, time and court in words, and any warning cancel_check gave.
+      Afterwards, run my_reservations to confirm it's gone.
+    grant_categories: [write]
+    args:
+      summary: { type: string, required: true }
+      id: { type: string, required: true }
+    output: text
+    http:
+      method: POST
+      url: "https://{{config.portal_host}}/event/cancel-court-time-do?ajax=true"
+      headers: *ajax_headers
+      form:
+        id: "{{args.id}}"
+        confirm: "1"
+      response:
+        output: text
+
+# Reading is allowed when an agent is granted the connection. reserve and
+# cancel have no rule, so your keep asks you every time, showing the summary.
+default_rules:
+  - action: external_resource.verge_labs/club_automation.list_options
+    decision: allow
+  - action: external_resource.verge_labs/club_automation.list_slots
+    decision: allow
+  - action: external_resource.verge_labs/club_automation.my_reservations
+    decision: allow
+  - action: external_resource.verge_labs/club_automation.reserve_preview
+    decision: allow
+  - action: external_resource.verge_labs/club_automation.cancel_check
+    decision: allow
