@@ -7,7 +7,7 @@ description: |
   club whose member portal runs on Club Automation. Signs in as you with your
   portal email and password; the keep holds the session, and your agent never
   sees either. Configure with your club's portal address.
-version: 0.1.0
+version: 0.1.1
 # Session sign-in (D-415) needs manifest_schema 3; older keeps refuse it.
 manifest_schema: 3
 auth_scheme: none
@@ -113,6 +113,7 @@ verbs:
       value/label pairs from the booking page. Values are what the other
       verbs take as sport and location. For a sport's courts, use
       list_courts.
+    effect: read
     grant_categories: [read]
     output: json
     http:
@@ -127,6 +128,7 @@ verbs:
       The locations and courts for one sport on one date, as value/label
       pairs (the form's time-of-day choices are in the list too; ignore
       them).
+    effect: read
     grant_categories: [read]
     args:
       sport: { type: string, required: true }
@@ -155,6 +157,7 @@ verbs:
       length. Each slot has start (pass it to reserve as is), location,
       surface and the time as the portal shows it. An empty list means
       nothing is open.
+    effect: read
     grant_categories: [read]
     args:
       sport: { type: string, required: true }
@@ -182,6 +185,7 @@ verbs:
     description: |
       Your upcoming reservations: date, time, activity (with the court) and
       the id that cancel takes.
+    effect: read
     grant_categories: [read]
     output: json
     http:
@@ -196,6 +200,7 @@ verbs:
       What a booking would be, without making it: day and time, location,
       and who would be invoiced. Run it before reserve, and put what it says
       in your request to book.
+    effect: read
     grant_categories: [read]
     args:
       sport: { type: string, required: true }
@@ -226,6 +231,7 @@ verbs:
       Book the slot. Takes the same arguments as reserve_preview, plus
       summary: the day, time and court in words, exactly as the preview
       showed them (it is what your owner sees when asked).
+    effect: change
     grant_categories: [write]
     args:
       summary: { type: string, required: true }
@@ -258,6 +264,7 @@ verbs:
       What cancelling a reservation would mean, without cancelling: the
       portal's warning, such as a late-cancellation charge. Run it before
       cancel, and put what it says in your request to cancel.
+    effect: read
     grant_categories: [read]
     args:
       id: { type: string, required: true }
@@ -276,6 +283,7 @@ verbs:
       Cancel a reservation by its id (from my_reservations). Takes summary:
       the day, time and court in words, and any warning cancel_check gave.
       Afterwards, run my_reservations to confirm it's gone.
+    effect: change
     grant_categories: [write]
     args:
       summary: { type: string, required: true }
