@@ -7,7 +7,7 @@ description: |
   club whose member portal runs on Club Automation. Signs in as you with your
   portal email and password; the keep holds the session, and your agent never
   sees either. Configure with your club's portal address.
-version: 0.1.1
+version: 0.1.2
 # Session sign-in (D-415) needs manifest_schema 3; older keeps refuse it.
 manifest_schema: 3
 auth_scheme: none
