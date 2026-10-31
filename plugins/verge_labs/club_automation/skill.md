@@ -11,8 +11,9 @@ description: >
 # Club courts
 
 Invoke via `keepcmd resource invoke <connection> <verb> '<args-json>'`.
-`<connection>` is the name in your resource list (for example `club`).
-Arguments are one JSON object in single quotes.
+`<connection>` is the name your connection was given: the last part of this
+skill's folder name (`…-club` means `club`). Use it as it is; there's no
+need to list your resources. Arguments are one JSON object in single quotes.
 
 Bookings are made in **your owner's name**, on their membership, whoever in
 the chat asked. Your keep asks your owner before every `reserve` and
