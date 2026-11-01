@@ -1,18 +1,24 @@
-# Hearth plugins
+# Keep Cmd plugins
 
-The plugin catalog for [Hearth Cmd](https://hearthcmd.com). Each plugin
-connects your agents to an outside service — your calendar, your files, your
-smart home — through a declared, permissioned set of actions.
+The plugin catalog for Keep Cmd (`keepcmd`), the program that runs a keep —
+the machine that is a Source Cmd space's server. Each plugin connects your
+agents to an outside service — your calendar, your files, your smart home —
+through a declared, permissioned set of actions. Plugins run on your keep, so
+one installed plugin serves every space and app the keep runs: Loop Cmd chats
+and Hearth Cmd households alike.
 
-Install one on a host with:
+(This repo was `hearth-plugins`; it was renamed when the catalog stopped
+belonging to one app. GitHub redirects the old name.)
+
+Install one on your keep with:
 
 ```bash
-hearth plugin install verge_labs/google_calendar_oauth
+keepcmd plugin install verge_labs/google_calendar_oauth
 ```
 
-Browsing this page **is** the discovery mechanism for now: find the plugin you
-want below, copy its slug, and install it. There is no `hearth plugin search`
-yet.
+`keepcmd plugin list`, `uninstall` and `rollback` do the rest. Browsing this
+page **is** the discovery mechanism for now: find the plugin you want below,
+copy its slug, and install it. There is no `keepcmd plugin search` yet.
 
 ---
 
@@ -22,7 +28,7 @@ yet.
 |---|---|---|---|
 | `verge_labs/google_calendar_oauth` | Google Calendar | OAuth | Create and manage Google Calendar events. Connects as you. |
 | `verge_labs/google_calendar` | Google Calendar (Service Account) | Service account | Same, for Google Workspace acting as any user. |
-| `verge_labs/google_drive_oauth` | Google Drive | OAuth | Read and write Drive files. Limited to files Hearth creates or you explicitly open. |
+| `verge_labs/google_drive_oauth` | Google Drive | OAuth | Read and write Drive files. Limited to files your agents create or you explicitly open. |
 | `verge_labs/google_drive` | Google Drive (Service Account) | Service account | Same, for Workspace-wide access. |
 | `verge_labs/google_people_oauth` | Google Contacts | OAuth | Look up family, neighbours, the plumber, the kids' school. |
 | `verge_labs/google_people` | Google People (Service Account) | Service account | Look up people in a Workspace organization. |
@@ -62,11 +68,11 @@ account, make a second connection.
 
 A plugin is **declarative**: a `manifest.yaml` describing HTTP calls, plus an
 optional `skill.md` that teaches an agent how to use them. There is no
-executable and no plugin process — the Hearth daemon makes the calls itself.
+executable and no plugin process — the keep makes the calls itself.
 
 That is a deliberate constraint, not a limitation we intend to lift casually.
 A manifest can only do what it declares, and every verb in it is subject to
-your permission rules. Arbitrary code running as your daemon user is a very
+your permission rules. Arbitrary code running as you on your keep is a very
 different risk, so binary plugins cannot be published here at all; they install
 from a local archive, where a human handled the file.
 
@@ -77,7 +83,7 @@ plugins/<namespace>/<name>/
 ```
 
 The directory path must equal the manifest's `plugin_slug`. The index builder
-and the daemon both enforce this.
+and the keep both enforce this.
 
 `skill.md` is optional in the format, but in practice a verb with no skill
 coverage is a verb agents use wrong — it reaches them as a bare name with no
@@ -117,48 +123,59 @@ credentials:
     scopes: [playback-control-all]
 ```
 
-That is the whole integration. The relay has one generic provider that reads
-this block; there is no per-upstream code to write.
+That is the whole integration. The keep has one generic provider that reads
+this block; there is no per-upstream code to write. Sign-in runs between the
+app and your keep (PKCE), and the refresh token is sealed to your keep —
+the relay never holds it.
 
-**What is not here, and cannot be:** the `client_id` and `client_secret`. Those
-identify *us* as the integration rather than the user, so they can't live in a
-public catalog and can't be handed to every host. They go in the relay's
-environment as `SONOS_OAUTH_CLIENT_ID` / `_CLIENT_SECRET` / `_REDIRECT_URI` —
-the presence of a `<SLUG>_OAUTH_CLIENT_ID` is what registers provider `<slug>`.
-The redirect URI must also be registered with the upstream, and points at the
-relay (`https://api.hearthcmd.com/oauth/callback/<slug>`), not at a host.
+**What is not here, and cannot be:** a `client_id` or `client_secret`. Google
+plugins use Source Cmd's own app client, built into keepcmd. For any other
+upstream, the person connecting registers their own free app with the
+upstream (as Spotify's setup describes) and gives its client details to the
+connection; its redirect URI is `https://relaycmd.com/oauth/redirect`, a
+page that only hands the code back to the Source Cmd app.
 
-So an OAuth plugin ships as a manifest here plus two secrets on the server.
 Prefer `api_key` auth when the upstream offers it — the user pastes their own
 token and nothing needs to be registered by anyone.
 
 ### Compatibility
 
 A manifest may declare `min_daemon_version`. It means "this plugin needs a
-runtime feature that older hearth binaries don't have" — for example
+runtime feature that older keepcmd binaries don't have" — for example
 `verge_labs/google_drive_oauth` uses the `||` fallback operator in its
 templates, which older binaries parse as a literal path. Declaring the floor
 turns a confusing runtime error into a refusal at install time telling you to
-run `hearth update`.
+update the keep (`keepcmd hub update`).
 
 This is distinct from `manifest_schema`, which says which *format* the
-manifest is written in.
+manifest is written in. Schema 3 adds two optional things: a top-level
+`session:` block for sites that sign in with a username and password and keep
+a cookie (the keep holds the session; the agent never sees the password or
+the cookie), and a per-verb `effect:` — `read`, `change` or `send` — which
+the rules view, the approval ask and taint handling all read (a verb without
+one counts as `change`). No plugin in this catalog uses schema 3 yet; the
+format is specified in the Source Cmd repo
+(`docs/20261030-plugin-session-sign-in-design.md`).
 
 ---
 
 ## Releases
 
-`index.json` is **not** committed. It is generated at release time and
-uploaded as a release asset, because a committed index can drift from the
-manifests it claims to describe.
+Keeps fetch the catalog from **https://get.keepcmd.com/plugins/**
+(`index.json`, `index.json.sig`, `catalog.tar.gz`), never from this repo or
+its GitHub releases. Publishing is done from the Source Cmd repo:
 
 ```bash
-scripts/release.sh 2026.07.21
+SOURCECMD_PLUGIN_CATALOG_KEY=<plugin-catalog key file> \
+  scripts/plugins/publish.sh <this checkout> <SourceCmd/keepcmd checkout> 2026.11.01
 ```
 
-That writes `dist/index.json` and `dist/catalog.tar.gz`. Sign the index (see
-below), then create a GitHub release on the tag and upload all three files.
-The CLI resolves them by exact filename, so don't rename them.
+It runs this repo's `scripts/release.sh` to build `dist/`, signs the index,
+checks it the way a keep will, and copies it into the get.keepcmd.com feed
+checkout; it prints the commit and push commands rather than running them.
+
+`index.json` is **not** committed. It is generated at publish time, because a
+committed index can drift from the manifests it claims to describe.
 
 Both artifacts are **reproducible**: the index has sorted keys and no
 timestamp, and the tarball is built with a fixed mtime and owner. Rebuilding
@@ -201,83 +218,32 @@ instead of installing something mislabelled.
 
 ## Signing
 
-TLS proves you reached github.com. It does not prove github.com served what we
+TLS proves you reached get.keepcmd.com. It does not prove it served what we
 published — a compromised repo, a stolen credential, or a bad upload all serve
 perfectly valid TLS. The signature closes that gap, and it is the only reason
-`hearth plugin install <name>` is meaningfully safer than piping a URL into a
+`keepcmd plugin install <name>` is meaningfully safer than piping a URL into a
 shell.
 
-`index.json` is signed with Ed25519. `index.json.sig` is the raw 64-byte
-detached signature. Because the index carries a hash of every published file,
-one signature covers the whole catalog.
+`index.json` is signed with Ed25519, and `index.json.sig` is the detached
+signature. Because the index carries a hash of every published file, one
+signature covers the whole catalog.
 
-### Setup, once
+The signing key is not compiled into keepcmd. Keep Cmd's root keys are, and
+they delegate a key for the `plugin_catalog` role in a signed delegations
+document on the same feed, with an expiry and a revocation list. A keep
+verifies the delegation, then the catalog under the delegated key, so the
+catalog key can be rotated or revoked without shipping a new binary. The
+plugin-catalog key lives offline and is brought onto a machine only to sign.
 
-Requires real OpenSSL — macOS ships LibreSSL, which cannot do Ed25519:
+### Superseded scripts
 
-```bash
-brew install openssl@3
-scripts/keygen.sh          # writes to ~/hearth-plugin-signing-keys/
-```
-
-That writes two files:
-
-| File | | |
-|---|---|---|
-| `hearth-catalog-signing.key` | **private** | mode 0600, cold storage |
-| `hearth-catalog-signing.pub` | public | safe to share |
-
-and prints the **public** key as hex. That hex is meant to be published — it
-is compiled into every hearth binary. Paste it into hearth-cmd's
-`cli/plugin_catalog_verify.go`:
-
-```go
-var trustedCatalogKeys = []string{
-    "…hex…",
-}
-```
-
-**The private key is the whole security model.** Anyone holding it can publish
-a catalog every hearth binary installs without question. It must never exist
-on the relay server, on a build box, in CI, or in this repo. Generate it where
-it will live so it never has to travel.
-
-### Each release
-
-Signing is deliberately not part of `release.sh`: the build runs wherever the
-repo lives, the key lives in cold storage somewhere else, and wiring them
-together would mean copying the key onto the build box.
-
-```bash
-# on the build machine
-scripts/release.sh 2026.07.21
-#   → copy dist/index.json and dist/catalog.tar.gz to the signing machine
-
-# on the signing machine
-scripts/sign-index.sh index.json ~/hearth-plugin-signing-keys/hearth-catalog-signing.key
-#   → upload index.json, index.json.sig, catalog.tar.gz to the release
-```
-
-`sign-index.sh` verifies what it just produced before handing it back — a
-signature that doesn't check out is worth catching before publication, not
-after every host starts refusing to install.
-
-### Rotation
-
-**Rotation is a two-release process, not a swap.** The trusted keys are
-compiled into each binary, so:
-
-1. Ship a hearth release trusting **both** the old and new keys.
-2. Wait for it to propagate. Binaries that never update keep trusting only
-   the old key.
-3. Ship a release trusting only the new key.
-
-Signing with a key that isn't in a host's binary makes the catalog
-uninstallable for that host, which is why step 1 cannot be skipped.
-
-The honest limitation: there is **no revocation channel**. A binary trusting a
-compromised key keeps trusting it until it updates. The lever that forces
-updates is the server-side `HEARTH_MIN_CLI` gate.
+`scripts/keygen.sh` and `scripts/sign-index.sh` belong to the old scheme —
+a single catalog key compiled into each binary, and a GitHub release per
+catalog. Current keeps don't trust that key, and nothing reads GitHub
+releases any more; key generation and signing are now Keep Cmd's release
+tooling, driven by `publish.sh`. They are kept here for reference only.
+`scripts/release.sh` and `scripts/build-index.py` are still used: they build
+`dist/`.
 
 ---
 
