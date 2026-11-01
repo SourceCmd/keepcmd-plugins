@@ -31,6 +31,7 @@ yet.
 | `verge_labs/spotify` | Spotify | OAuth (your own app) | Search Spotify and play it, control transport and volume, move playback between devices. |
 | `verge_labs/home_assistant_music_assistant` | Music Assistant | API key | Play music by name on any speaker Home Assistant drives, per-room volume, grouping, move music between rooms. |
 | `verge_labs/github` | GitHub | API key | Read and write GitHub issues, pull requests, files, and commits. |
+| `verge_labs/club_automation` | Club Automation courts | Email and password (session sign-in) | Find open courts, book and cancel at a club whose member portal runs on Club Automation. Needs a keep with session sign-in (manifest schema 3). |
 
 ### Three ways to play music
 
