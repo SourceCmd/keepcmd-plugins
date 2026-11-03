@@ -16,9 +16,11 @@ skill's folder name (`…-club` means `club`). Use it as it is; there's no
 need to list your resources. Arguments are one JSON object in single quotes.
 
 Bookings are made in **your owner's name**, on their membership, whoever in
-the chat asked. Your keep asks your owner before every `reserve` and
-`cancel`; that's expected, not an error. Say so when you ask: "I've asked
-<owner> to approve it."
+the chat asked. **Running `reserve` or `cancel` is what asks your owner:**
+the command waits until they answer, then returns the result (or fails
+with `denied` if they decline). Nothing asks them before you run it: a
+preview asks no one. So never say you've asked, or that a booking is
+waiting for approval, until you've run `reserve` (or `cancel`).
 
 ## The verbs
 
@@ -43,7 +45,7 @@ the chat asked. Your keep asks your owner before every `reserve` and
    `minutes` (60 or 90, whatever the person asked; ask if they didn't),
    and `court` if they named one.
    ```
-   keepcmd resource invoke club list_slots '{"sport":"38","date":"10/31/2026","minutes":60}'
+   keepcmd resource invoke <connection> list_slots '{"sport":"38","date":"10/31/2026","minutes":60}'
    ```
    Each slot has `start` (a number), `location`, `surface` and `time`
    (`7:00pm`). Copy `start`, `location` and `surface` as they are. **Never
@@ -53,8 +55,9 @@ the chat asked. Your keep asks your owner before every `reserve` and
    let them choose. "Tomorrow evening" is not a time: offer the open ones.
 4. **Preview:** `reserve_preview` with the same arguments plus `start`,
    `location`, `surface`. Read the day, time, place and invoice it shows.
-5. **Book:** `reserve` with the same arguments plus `summary`: the day, time
-   and court in words, as the preview showed them, and any charge, e.g.
+5. **Book, straight after the preview:** `reserve` with the same arguments
+   plus `summary`: the day, time and court in words, as the preview showed
+   them, and any charge, e.g.
    `"Fri Oct 31, 7:00–8:00 PM, Center Court 3, no invoice"`. The summary
    is what your owner reads when asked; it must match the slot.
 6. **Confirm:** the answer says "Reservation Completed" when it worked.
